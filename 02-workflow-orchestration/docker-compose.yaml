@@ -26,6 +26,11 @@ services:
     environment:
       - PGADMIN_DEFAULT_EMAIL=admin@admin.com
       - PGADMIN_DEFAULT_PASSWORD=root
+      - PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION=False
+      - PGADMIN_CONFIG_WTF_CSRF_ENABLED=False
+      - PGADMIN_CONFIG_WTF_CSRF_CHECK_DEFAULT=False
+      - PGADMIN_CONFIG_SESSION_COOKIE_SAMESITE='Lax'
+      - PGADMIN_CONFIG_SESSION_COOKIE_SECURE=False
     ports:
       - "8085:80"
     depends_on:
