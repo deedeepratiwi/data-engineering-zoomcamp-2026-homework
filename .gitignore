@@ -6,8 +6,14 @@
 *.duckdb
 *.db
 
+# This ignores folders named exactly 'data' or 'Data'
+**/data/
+**/Data/
+
+# This ignores the duckdb temp files specifically
+**/.tmp/
+
 # Catch-all for data
-*[Dd]ata*/
 *.parquet
 *.csv
 *.csv.gz
