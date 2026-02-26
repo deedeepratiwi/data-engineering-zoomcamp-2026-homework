@@ -1,0 +1,12 @@
+docker compose logs pgadmin --tail 50
+docker compose logs -f
+lsof -i :8080
+docker compose exec kestra netstat -tlnp | grep 8080
+cat docker-compose.yaml | grep -A 5 ports
+
+docker compose exec pgdatabase psql -U root -d ny_taxi
+
+sudo apt-get clean
+pip cache purge
+docker system prune -f
+docker volume prune -f
