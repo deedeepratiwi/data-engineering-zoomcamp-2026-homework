@@ -1,0 +1,150 @@
+docker compose exec jobmanager ./bin/flink run \
+    -py /opt/src/job/aggregation_job_hw.py \
+    --pyFiles /opt/src -d
+	
+	
+docker compose exec -it jobmanager ./bin/flink run -py /opt/src/job/pass_through_job_hw.py --pyFiles /opt/src -d
+
+docker compose exec jobmanager ./bin/flink run \
+    -py /opt/src/job/pass_through_job_hw.py \
+    --pyFiles /opt/src -d
+
+CREATE TABLE processed_events (
+            lpep_pickup_datetime VARCHAR,
+            lpep_dropoff_datetime VARCHAR,
+            PULocationID INTEGER,
+            DOLocationID INTEGER,
+            passenger_count INTEGER,
+            trip_distance DOUBLE PRECISION ,
+            tip_amount DOUBLE PRECISION,
+            total_amount DOUBLE PRECISION,
+            pickup_datetime TIMESTAMP
+		)
+			
+docker exec -it 07-streaming-redpanda-1 rpk topic delete green-
+
+docker compose exec redpanda rpk topic delete green-trips
+
+
+docker compose exec postgres psql -U postgres -d postgres -c "SELECT PULocationID, num_trips FROM processed_events_aggregated ORDER BY num_trips DESC;"
+
+docker compose exec postgres psql -U postgres -d postgres -c "SELECT PULocationID, num_trips FROM processed_events_aggregated ORDER BY num_trips DESC;"
+
+CREATE TABLE processed_events_aggregated (
+    window_start TIMESTAMP(3),
+    PULocationID INT,
+    num_trips BIGINT,
+    tip_amount DOUBLE PRECISION,
+    PRIMARY KEY (window_start, PULocationID)
+);
+
+
+docker compose exec jobmanager ./bin/flink run -py /opt/src/job/aggregation_job_hw.py --pyFiles /opt/src -d
+
+uv run python src/producers/producer.py
+
+
+docker compose exec postgres psql -U postgres -d postgres -c "SELECT * FROM processed_events_aggregated LIMIT 10;"
+
+SELECT PULocationID, num_trips
+FROM processed_events
+ORDER BY num_trips DESC
+LIMIT 3;
+
+
+# Clear the PostgreSQL table
+docker compose exec postgres psql -U postgres -d postgres -c "TRUNCATE TABLE processed_events;"
+
+# Delete and recreate the topic to clear Kafka
+docker compose exec redpanda rpk topic delete green-trips
+
+# Start the job with the fix
+docker compose exec jobmanager ./bin/flink run -py /opt/src/job/pass_through_job_hw.py --pyFiles /opt/src -d
+
+# Run the producer
+uv run python src/producers/producer.py
+
+# Query the results
+docker compose exec postgres psql -U postgres -d postgres -c "SELECT * FROM processed_events LIMIT 5;"
+
+
+docker compose exec postgres psql -U postgres postgres -c "DROP TABLE processed_events_aggregated" 
+
+# Kill the failed job
+docker compose exec jobmanager ./bin/flink cancel $(docker compose exec jobmanager ./bin/flink list -r | grep pass_through | awk '{print $4}')
+
+# Create the PostgreSQL table
+docker compose exec postgres psql -U postgres postgres -c "CREATE TABLE IF NOT EXISTS processed_events_aggregated (window_start TIMESTAMP(3), PULocationID INT, num_trips BIGINT, tip_amount DOUBLE PRECISION, PRIMARY KEY (window_start, PULocationID));"
+
+# Clear the data
+docker compose exec postgres psql -U postgres postgres -c "TRUNCATE TABLE processed_events_aggregated;"
+
+# Delete and recreate topic
+docker compose exec redpanda rpk topic delete green-trips
+
+# Start the corrected job
+docker compose exec jobmanager ./bin/flink run -py /opt/src/job/aggregation_job_hw.py --pyFiles /opt/src -d
+
+# Run the producer
+sleep 5
+uv run python src/producers/producer.py
+
+# Check for results
+docker compose exec postgres psql -U postgres postgres -c "SELECT COUNT(*) FROM processed_events_aggregated;"
+
+docker compose exec postgres psql -U postgres postgres -c "SELECT * FROM processed_events_aggregated ORDER BY num_trips DESC LIMIT 3;"
+
+
+question 4
+docker compose exec redpanda rpk topic delete green-trips
+docker compose exec jobmanager ./bin/flink run -py /opt/src/job/tumbling_window_5min_job_hw.py --pyFiles /opt/src -d
+sleep 5
+uv run python src/producers/producer.py
+sleep 90
+docker compose exec postgres psql -U postgres postgres -c "SELECT PULocationID, num_trips FROM tumbling_5min_results ORDER BY num_trips DESC LIMIT 3;"
+
+
+
+
+
+
+# Create the PostgreSQL table
+docker compose exec postgres psql -U postgres postgres -c "CREATE TABLE IF NOT EXISTS session_window_results (window_start TIMESTAMP(3), window_end TIMESTAMP(3), PULocationID INT, num_trips BIGINT, PRIMARY KEY (window_start, window_end, PULocationID));"
+
+# Clear the PostgreSQL table
+docker compose exec postgres psql -U postgres -d postgres -c "TRUNCATE TABLE session_window_results;"
+
+# Clear the topic
+docker compose exec redpanda rpk topic delete green-trips
+
+# Start the session window job
+docker compose exec jobmanager ./bin/flink run -py /opt/src/job/session_window_job_hw.py --pyFiles /opt/src -d
+
+# Wait for the job to start, then send data
+sleep 90
+uv run python src/producers/producer.py
+
+# Wait for processing and query results
+sleep 90
+docker compose exec postgres psql -U postgres postgres -c "SELECT PULocationID, num_trips FROM session_window_results ORDER BY num_trips DESC LIMIT 1;"
+
+
+# Create the PostgreSQL table
+docker compose exec postgres psql -U postgres postgres -c "CREATE TABLE IF NOT EXISTS hourly_tips_results (window_start TIMESTAMP(3), total_tips DOUBLE PRECISION, PRIMARY KEY (window_start));"
+
+# Clear the topic
+docker compose exec redpanda rpk topic delete green-trips
+
+# Start the hourly tips job
+docker compose exec jobmanager ./bin/flink run -py /opt/src/job/hourly_tips_job_hw.py --pyFiles /opt/src -d
+
+# Wait for job to start, then run producer
+sleep 10
+uv run python src/producers/producer.py
+
+# Wait for processing
+sleep 120
+
+# Query the hour with highest total tips
+sleep 120
+docker compose exec postgres psql -U postgres postgres -c "SELECT window_start, total_tips FROM hourly_tips_results ORDER BY total_tips DESC LIMIT 5;"
